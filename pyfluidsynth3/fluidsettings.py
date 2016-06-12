@@ -105,19 +105,20 @@ class FluidSettings(object):
         key_type = self.handle.fluid_settings_get_type( self.settings, key )
         
         if key_type is self.FLUID_STR_TYPE:
-            value = utility.fluidstring( key )
+            value = utility.fluidstring( value )
             if not self.handle.fluid_settings_setstr( self.settings, key, value ):
                 raise KeyError( key )
             
         else:
-            # Coerce string value to integer before going further.
-            value = self.__coerce_to_int( value )
-            
             if key_type is self.FLUID_NUM_TYPE:
+                # Coerce string value to float before going further.
+                value = self.__coerce_to_float(value)
                 if not self.handle.fluid_settings_setnum( self.settings, key, value ):
                     raise KeyError( key )
                 
             elif key_type is self.FLUID_INT_TYPE:
+                # Coerce string value to integer before going further.
+                value = self.__coerce_to_int(value)
                 if not self.handle.fluid_settings_setint( self.settings, key, value ):
                     raise KeyError( key )
                 
@@ -130,3 +131,11 @@ class FluidSettings(object):
             return int( stringValue )
         except ValueError:
             return int( stringValue.lower() not in ('false', 'no', 'off') )
+
+
+    def __coerce_to_float(self, stringValue):
+        ''' Turn a string into an float. '''
+        try:
+            return float(stringValue)
+        except ValueError:
+            return float(stringValue.lower() not in ('false', 'no', 'off'))
