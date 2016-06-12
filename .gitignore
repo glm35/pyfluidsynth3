@@ -37,3 +37,9 @@ nosetests.xml
 /libfluidsynth.dll
 /ArriettysSong.mid
 /FluidR3_GM.sf2
+
+# PyCharm
+.idea/
+
+# Vim
+*.swp
