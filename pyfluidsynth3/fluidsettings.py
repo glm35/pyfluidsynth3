@@ -89,7 +89,12 @@ class FluidSettings(object):
             func = self.handle.fluid_settings_getint
         elif key_type is self.FLUID_STR_TYPE:
             val = c_char_p()
-            func = self.handle.fluid_settings_getstr
+            try:
+                func = self.handle.fluid_settings_getstr
+            except AttributeError:
+                # fluid_settings_getstr removed from libfluidsynth 2.0.0
+                # TODO: what's the alternative?
+                raise KeyError( key )
         else:
             raise KeyError( key )
 
@@ -103,27 +108,26 @@ class FluidSettings(object):
         
         key = utility.fluidstring( key )
         key_type = self.handle.fluid_settings_get_type( self.settings, key )
-        
+
         if key_type is self.FLUID_STR_TYPE:
             value = utility.fluidstring( value )
-            if not self.handle.fluid_settings_setstr( self.settings, key, value ):
+            ret = self.handle.fluid_settings_setstr(self.settings, key, value)
+            if self._normalize_retcode(ret) == constants.FAILED:
                 raise KeyError( key )
-            
+        elif key_type is self.FLUID_NUM_TYPE:
+            # Coerce string value to float before going further.
+            value = self.__coerce_to_float(value)
+            ret = self.handle.fluid_settings_setnum( self.settings, key, value )
+            if self._normalize_retcode( ret ) == constants.FAILED:
+                raise KeyError( key )
+        elif key_type is self.FLUID_INT_TYPE:
+            # Coerce string value to integer before going further.
+            value = self.__coerce_to_int(value)
+            ret = self.handle.fluid_settings_setint( self.settings, key, value )
+            if self._normalize_retcode( ret ) == constants.FAILED:
+                raise KeyError( key )
         else:
-            if key_type is self.FLUID_NUM_TYPE:
-                # Coerce string value to float before going further.
-                value = self.__coerce_to_float(value)
-                if not self.handle.fluid_settings_setnum( self.settings, key, value ):
-                    raise KeyError( key )
-                
-            elif key_type is self.FLUID_INT_TYPE:
-                # Coerce string value to integer before going further.
-                value = self.__coerce_to_int(value)
-                if not self.handle.fluid_settings_setint( self.settings, key, value ):
-                    raise KeyError( key )
-                
-            else:
-                raise KeyError( key )
+            raise KeyError( key )
             
     def __coerce_to_int( self, stringValue ):
         ''' Turn a string into an integer. '''
@@ -139,3 +143,17 @@ class FluidSettings(object):
             return float(stringValue)
         except ValueError:
             return float(stringValue.lower() not in ('false', 'no', 'off'))
+
+    def _normalize_retcode(self, retcode):
+        """Normalize fluid_settings_* return code to follow libfluidsynth 2.0.0 convention
+
+           libfluidsynth v1: return 1 if the value has been set, 0 otherwise
+           libfluidsynth v2: return 0 (FLUID_OK) if the value has been set, -1 (FLUID_FAILED) otherwise
+        """
+        if self.handle.get_version() == 1:
+            if retcode == 1:
+                retcode = constants.OK
+            else:
+                retcode = constants.FAILED
+
+        return retcode

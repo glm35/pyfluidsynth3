@@ -4,6 +4,9 @@ from ctypes.util import find_library
 import os
 import re
 
+from . import fluiderror
+
+
 class FluidHandle():
     ''' Creates a handle to the FluidSynth library. A instance of this class can be used the same
     way any real library handle to FluidSynth can be used. It "implements" all necessary 
@@ -28,7 +31,7 @@ class FluidHandle():
         ''' Creates a handle to the FluidSynth library. If a path is given it tries to use this path
         if not it searches for the library. '''
         self.handle = self.load_library( library_path )
-        
+
         # From settings.h
         self.new_fluid_settings = self.handle.new_fluid_settings
         self.new_fluid_settings.argtypes = ()
@@ -49,11 +52,17 @@ class FluidHandle():
         self.fluid_settings_getint = self.handle.fluid_settings_getint
         self.fluid_settings_getint.argtypes = (c_void_p, c_char_p, c_void_p)
         self.fluid_settings_getint.restype = c_int
-        
-        self.fluid_settings_getstr = self.handle.fluid_settings_getstr
-        self.fluid_settings_getstr.argtypes = (c_void_p, c_char_p, c_void_p)
-        self.fluid_settings_getstr.restype = c_int
-        
+
+        try:
+            self.fluid_settings_getstr = self.handle.fluid_settings_getstr
+            self.fluid_settings_getstr.argtypes = (c_void_p, c_char_p, c_void_p)
+            self.fluid_settings_getstr.restype = c_int
+            self._version = 1
+        except AttributeError:
+            # fluid_settings_getstr() was removed in fluidsynth 2.0.0
+            # We use this as an heuristics to guess libfluidsynth version
+            self._version = 2
+
         self.fluid_settings_setnum = self.handle.fluid_settings_setnum
         self.fluid_settings_setnum.argtypes = (c_void_p, c_char_p, c_double)
         self.fluid_settings_setnum.restype = c_int
@@ -285,6 +294,12 @@ class FluidHandle():
                 if library_path:
                     break
 
+        # Stop here if library could not be found.
+        # Else cdll.LoadLibrary() will happily return a ctypes.CDLL object
+        # that we won't be able to use, leading to not so clear error messages later on.
+        if library_path is None:
+            raise fluiderror.FluidError( "Could not find fluidsynth library")
+
         # Use hopefully found library path to load library.
         self.library_path = library_path
         return cdll.LoadLibrary( self.library_path )
@@ -292,3 +307,7 @@ class FluidHandle():
     def __is_file( self, path ):
         ''' Checks if the given string is a file path. '''
         return path and os.path.isfile( path )
+
+    def get_version(self):
+        """Get libfluidsynth major version number"""
+        return self._version
