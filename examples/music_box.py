@@ -83,9 +83,10 @@ def create_synth():
 def delete_synth():
     global SEQUENCER, ADRIVER, SYNTH
 
+    # The following line is needed at least to avoid that seq_callback() gets called after the
+    # sequencer is deleted:
     HANDLE.fluid_sequencer_unregister_client(SEQUENCER.seq, MY_SEQ_ID)
-        # Needed at least to avoid that seq_callback() gets called after the
-        # sequencer is deleted.
+
     del SEQUENCER
     del ADRIVER
     del SYNTH
@@ -146,6 +147,7 @@ def schedule_next_sequence():
 
 def py_seq_callback(time, event, seq, data):
     schedule_next_sequence()
+
 
 FLUID_EVENT_CALLBACK = CFUNCTYPE(None, c_uint, c_void_p, c_void_p, c_void_p)
 # https://docs.python.org/3/library/ctypes.html#callback-functions
