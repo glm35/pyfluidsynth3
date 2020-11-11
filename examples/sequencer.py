@@ -1,71 +1,140 @@
 #! /usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from pyfluidsynth3 import fluidaudiodriver, fluidevent, fluidhandle, fluidsettings, fluidsequencer, fluidsynth
+"""
+Show how to use a FluidSequencer object.
 
+Create and configure a sequencer, then program a sequence of 5 chords, one per beat, at 120
+beats per minute (bpm).
+
+Run with:
+
+  $ cd /path/to/pyfluidsynth3
+  $ PYTHONPATH=. python3 examples/sequencer.py
+
+Based on the examples from pyfluidsynth by MostAwesomeDude.
+"""
+
+import argparse
+import pathlib
 import sys
 import time
+from typing import Optional
 
-''' Based on the examples from pyfluidsynth by MostAwesomeDude. '''
+from pyfluidsynth3 import fluidaudiodriver, fluidevent, fluidhandle, fluidsettings, \
+    fluidsequencer, fluidsynth
 
-if len(sys.argv) < 3:
-    print("Usage: {0} library soundfont.sf2".format(sys.argv[0]))
-    sys.exit()
 
-handle = fluidhandle.FluidHandle(sys.argv[1])
-settings = fluidsettings.FluidSettings(handle)
-synth = fluidsynth.FluidSynth(handle, settings)
-driver = fluidaudiodriver.FluidAudioDriver(handle, synth, settings)
-sequencer = fluidsequencer.FluidSequencer(handle)
+def parse_args():
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-sf", "--soundfont",
+                        help="Path to the sound font .sf2 file "
+                             "(optional, synth.py will try to find it).")
+    parser.add_argument("-l", "--fluidsynth-library",
+                        help="Path to libfluidsynth (optional, pyfluidsynth3 will try to find it).")
+    parser.add_argument("-ad", "--audio-driver", default='alsa',
+                        help="Audio driver to be used by fluidsynth (default: alsa)")
+    return parser.parse_args()
 
-synth.load_soundfont(sys.argv[2])
 
-sequencer.beats_per_minute = 120
-beat_length = sequencer.ticks_per_beat
+def find_soundfont() -> Optional[pathlib.Path]:
+    """Try to find a soundfont"""
 
-print("BPM: {0}".format(sequencer.beats_per_minute))
-print("TPB: {0}".format(sequencer.ticks_per_beat))
-print("TPS: {0}".format(sequencer.ticks_per_second))
+    # A few sound fonts from the fluid-soundfont-gm and timgm6mb-soundfont packages:
+    soundfont_catalog = ['/usr/share/sounds/sf2/FluidR3_GM.sf2',
+                         '/usr/share/sounds/sf2/TimGM6mb.sf2']
+    for sf in soundfont_catalog:
+        sf_path = pathlib.Path(sf)
+        if sf_path.exists():
+            return sf_path
+    return None
 
-dest = sequencer.add_synth(synth)
 
-c_scale = []
+class Sequencer:
+    def __init__(self, soundfont: Optional[pathlib.Path],
+                 fluidsynth_library: Optional[str], audio_driver: str):
+        self.handle = fluidhandle.FluidHandle(fluidsynth_library)
+        self.settings = fluidsettings.FluidSettings(self.handle)
 
-for note in range(60, 72):
-    event = fluidevent.FluidEvent(handle)
-    event.dest = dest[0]
-    event.note(0, note, 127, int(beat_length * 0.9))
-    c_scale.append(event)
+        self.synth = fluidsynth.FluidSynth(self.handle, self.settings)
+        self.synth.load_soundfont(str(soundfont))
 
-ticks = sequencer.ticks + 10
+        self.settings['audio.driver'] = audio_driver
+        self.driver = fluidaudiodriver.FluidAudioDriver(self.handle, self.synth, self.settings)
 
-sequencer.send(c_scale[0], ticks)
-sequencer.send(c_scale[4], ticks)
-sequencer.send(c_scale[7], ticks)
+        self.sequencer = fluidsequencer.FluidSequencer(self.handle)
+        self.synth_seq_id, _ = self.sequencer.add_synth(self.synth)
 
-ticks += beat_length
+    def __del__(self):
+        del self.sequencer
+        del self.driver
+        del self.synth
 
-sequencer.send(c_scale[0], ticks)
-sequencer.send(c_scale[5], ticks)
-sequencer.send(c_scale[9], ticks)
+    def play(self):
+        self.sequencer.beats_per_minute = 120
+        beat_length = self.sequencer.ticks_per_beat
 
-ticks += beat_length
+        print("BPM: {0}".format(self.sequencer.beats_per_minute))
+        print("TPB: {0}".format(self.sequencer.ticks_per_beat))
+        print("TPS: {0}".format(self.sequencer.ticks_per_second))
 
-sequencer.send(c_scale[0], ticks)
-sequencer.send(c_scale[4], ticks)
-sequencer.send(c_scale[7], ticks)
+        c_scale = []
 
-ticks += beat_length
+        for note in range(60, 72):
+            event = fluidevent.FluidEvent(self.handle)
+            event.dest = self.synth_seq_id
+            event.note(0, note, 127, int(beat_length * 0.9))
+            c_scale.append(event)
 
-sequencer.send(c_scale[2], ticks)
-sequencer.send(c_scale[5], ticks)
-sequencer.send(c_scale[7], ticks)
-sequencer.send(c_scale[11], ticks)
+        ticks = self.sequencer.ticks + 10
 
-ticks += beat_length
+        self.sequencer.send(c_scale[0], ticks)
+        self.sequencer.send(c_scale[4], ticks)
+        self.sequencer.send(c_scale[7], ticks)
 
-sequencer.send(c_scale[0], ticks)
-sequencer.send(c_scale[4], ticks)
-sequencer.send(c_scale[7], ticks)
+        ticks += beat_length
 
-time.sleep(16)
+        self.sequencer.send(c_scale[0], ticks)
+        self.sequencer.send(c_scale[5], ticks)
+        self.sequencer.send(c_scale[9], ticks)
+
+        ticks += beat_length
+
+        self.sequencer.send(c_scale[0], ticks)
+        self.sequencer.send(c_scale[4], ticks)
+        self.sequencer.send(c_scale[7], ticks)
+
+        ticks += beat_length
+
+        self.sequencer.send(c_scale[2], ticks)
+        self.sequencer.send(c_scale[5], ticks)
+        self.sequencer.send(c_scale[7], ticks)
+        self.sequencer.send(c_scale[11], ticks)
+
+        ticks += beat_length
+
+        self.sequencer.send(c_scale[0], ticks)
+        self.sequencer.send(c_scale[4], ticks)
+        self.sequencer.send(c_scale[7], ticks)
+
+        time.sleep(3)
+
+
+if __name__ == "__main__":
+    args = parse_args()
+
+    soundfont = args.soundfont
+    if soundfont is None:
+        soundfont = find_soundfont()
+        if soundfont is None:
+            print('Error: no sound font can be found')
+            sys.exit(1)
+    print('Using sound font:', soundfont)
+    print('Using audio driver:', args.audio_driver)
+
+    sequencer = Sequencer(soundfont, args.fluidsynth_library, args.audio_driver)
+    try:
+        sequencer.play()
+    except KeyboardInterrupt:
+        print('Playback aborted')

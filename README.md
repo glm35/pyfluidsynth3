@@ -67,4 +67,3 @@ If you try to access FluidSynth raw method you must encode every string paramete
 ## Known Issues
 
 - Not all FluidSynth methods are implemented.
-- The example sequencer.py seems not to work.
