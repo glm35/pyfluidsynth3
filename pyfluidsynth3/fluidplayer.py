@@ -53,6 +53,19 @@ class FluidPlayer:
         """ Wait for a MIDI player to terminate (when done playing). """
         self.handle.fluid_player_join(self.player)
 
+    # MIDI player status codes:
+    (READY, PLAYING, DONE) = range(0, 3)
+
+    def get_status(self) -> int:
+        """ Get MIDI player status.
+
+        Return player status:
+            FluidPlayer.READY: Player is ready.
+            FluidPlayer.PLAYING: Player is currently playing.
+            FluidPlayer.DONE: Player is finished playing.
+        """
+        return self.handle.fluid_player_get_status(self.player)
+
     def pause(self):
         """ Pause player or start again if already paused. """
         if self.paused:
