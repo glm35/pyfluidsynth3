@@ -53,6 +53,18 @@ class FluidPlayer:
         """ Wait for a MIDI player to terminate (when done playing). """
         self.handle.fluid_player_join(self.player)
 
+    def set_loop(self, loop: int) -> None:
+        """
+        Enable looping of a MIDI player.
+
+        For example, if you want to loop the playlist twice, set loop to 2 and call this
+        function before you start the player.
+
+        Parameters:
+            loop: Times left to loop the playlist. -1 means loop infinitely.
+        """
+        self.handle.fluid_player_set_loop(self.player, loop)
+
     # MIDI player status codes:
     (READY, PLAYING, DONE) = range(0, 3)
 

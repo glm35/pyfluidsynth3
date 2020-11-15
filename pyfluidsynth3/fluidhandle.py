@@ -164,6 +164,10 @@ class FluidHandle:
         self.fluid_player_join.argtypes = (c_void_p,)
         self.fluid_player_join.restype = c_int
 
+        self.fluid_player_set_loop = self.handle.fluid_player_set_loop
+        self.fluid_player_set_loop.argtypes = (c_void_p, c_int)
+        self.fluid_player_set_loop.restype = c_int
+
         self.fluid_player_get_status = self.handle.fluid_player_get_status
         self.fluid_player_get_status.argtypes = (c_void_p,)
         self.fluid_player_get_status.restype = c_int

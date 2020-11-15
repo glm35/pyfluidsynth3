@@ -35,7 +35,8 @@ def parse_args():
     parser.add_argument("midi_file", type=str,
                         help="Path to MIDI file")
     parser.add_argument("-r", "--repeat", type=int, default=1,
-                        help="Number of times to repeat the playback (default: 1)")
+                        help="Number of times to repeat the playback (default: 1). "
+                             "-1 means repeat infinitely")
     return parser.parse_args()
 
 
@@ -73,8 +74,9 @@ class Player:
 
     def play_midi(self, midi_file: pathlib.Path, repeat: int = 1):
         print(f'Playing {midi_file}, repeat {repeat} time(s)')
-        for _ in range(repeat):
-            self.player.play(str(midi_file))
+        self.player.add(str(midi_file))
+        self.player.set_loop(repeat)
+        self.player.play()
         while self.player.get_status() == FluidPlayer.PLAYING:
             time.sleep(1)
         # Remark: instead of polling player status, it is also possible to use
