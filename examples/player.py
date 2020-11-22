@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Show how to use a FluidPlayer object to play a midi file.
+Show how to use a FluidPlayer object to play one or more midi file(s).
 
 Run with:
 
@@ -16,7 +16,7 @@ import argparse
 import pathlib
 import sys
 import time
-from typing import Optional
+from typing import List, Optional
 
 from pyfluidsynth3 import fluidaudiodriver, fluidhandle, fluidsettings, fluidsynth
 from pyfluidsynth3.fluidplayer import FluidPlayer
@@ -24,10 +24,10 @@ from pyfluidsynth3.fluidplayer import FluidPlayer
 
 def parse_args():
     """Parse command line arguments."""
-    parser = argparse.ArgumentParser(description="Play a MIDI file")
+    parser = argparse.ArgumentParser(description="Play MIDI file(s)")
 
     # Positional arguments
-    parser.add_argument("midi_file", type=str, help="Path to MIDI file")
+    parser.add_argument("midi_files", nargs='*', help="Path(s) to the MIDI file(s) to play")
 
     # Optional arguments
     tempo_args = parser.add_mutually_exclusive_group()
@@ -92,16 +92,17 @@ class Player:
         # Remark: to convert from bpm to midi_tempo:
         # midi_tempo = int(60 * 1000 * 1000 / bpm)
 
-    def play_midi(self, midi_file: pathlib.Path, repeat: int = 1,
+    def play_midi(self, midi_files: List[str], repeat: int = 1,
                   bpm: Optional[int] = None, midi_tempo: Optional[int] = None):
-        print(f'Play {midi_file}')
+        print('Play MIDI file(s):', ', '.join(midi_files))
         if repeat != 1:
             if repeat == -1:
                 print('Repeat forever')
             else:
                 print(f'Repeat {repeat} times')
 
-        self.player.add(str(midi_file))
+        for midi_file in midi_files:
+            self.player.add(midi_file)
 
         if repeat != 1:
             self.player.set_loop(repeat)
@@ -114,6 +115,8 @@ class Player:
         # Workaround: set tempo a little while after playback start.  Besides the fragility of that
         # approach (the required delay may vary from machine to machine), there is another issue:
         # when a loop is set with fluid_player_set_loop(), the tempo is reset at the repeat.
+        # Similarly, when two files without tempo set are added to the player queue with
+        # fluid_player_add(), the tempo is reset when the second file starts playing.
         #
         # When no tempo is set in the midi file or via API: fluidsynth will play at bpm=120.
 
@@ -141,6 +144,6 @@ if __name__ == "__main__":
 
     player = Player(soundfont, args.fluidsynth_library, args.audio_driver)
     try:
-        player.play_midi(args.midi_file, args.repeat, args.bpm, args.midi_tempo)
+        player.play_midi(args.midi_files, args.repeat, args.bpm, args.midi_tempo)
     except KeyboardInterrupt:
         print('Playback aborted')
