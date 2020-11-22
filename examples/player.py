@@ -92,6 +92,23 @@ class Player:
         # Remark: to convert from bpm to midi_tempo:
         # midi_tempo = int(60 * 1000 * 1000 / bpm)
 
+    def get_tempo(self, tempo_type: str) -> int:
+        """Get tempo
+
+        Parameters:
+            tempo_type: 'bpm' or 'midi_tempo'
+
+        Returns:
+            Player tempo for the requested tempo type
+        """
+        if tempo_type == 'midi_tempo':
+            tempo = self.player.get_midi_tempo()
+            print(f'Get MIDI tempo (ms per quarter note): {tempo}')
+        else:
+            tempo = self.player.get_bpm()
+            print(f'Get tempo (bpm): {tempo}')
+        return tempo
+
     def play_midi(self, midi_files: List[str], repeat: int = 1,
                   bpm: Optional[int] = None, midi_tempo: Optional[int] = None):
         print('Play MIDI file(s):', ', '.join(midi_files))
@@ -100,6 +117,8 @@ class Player:
                 print('Repeat forever')
             else:
                 print(f'Repeat {repeat} times')
+
+        self.get_tempo(tempo_type='midi_tempo' if midi_tempo is not None else 'bpm')
 
         for midi_file in midi_files:
             self.player.add(midi_file)
@@ -122,6 +141,7 @@ class Player:
 
         time.sleep(0.01)
         self.set_tempo(bpm, midi_tempo)
+        self.get_tempo(tempo_type='midi_tempo' if midi_tempo is not None else 'bpm')
 
         while self.player.get_status() == FluidPlayer.PLAYING:
             time.sleep(1)

@@ -81,7 +81,7 @@ class FluidPlayer:
         """ Set the tempo of a MIDI player in beats per minute.
 
         Parameters:
-            bpm	Tempo in beats per minute
+            bpm: Tempo in beats per minute
 
         Note:
             Tempo change events contained in the MIDI file can override the specified BPM
@@ -101,6 +101,22 @@ class FluidPlayer:
             FluidPlayer.DONE: Player is finished playing.
         """
         return self.handle.fluid_player_get_status(self.player)
+
+    def get_bpm(self) -> int:
+        """ Get the tempo of a MIDI player in beats per minute.
+
+        Returns:
+            MIDI player tempo in BPM
+        """
+        return self.handle.fluid_player_get_bpm(self.player)
+
+    def get_midi_tempo(self) -> int:
+        """ Get the tempo of a MIDI player.
+
+        Returns:
+            Tempo of the MIDI player (in microseconds per quarter note, as per MIDI file spec)
+        """
+        return self.handle.fluid_player_get_midi_tempo(self.player)
 
     def pause(self):
         """ Pause player or start again if already paused. """
