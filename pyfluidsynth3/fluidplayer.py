@@ -54,8 +54,7 @@ class FluidPlayer:
         self.handle.fluid_player_join(self.player)
 
     def set_loop(self, loop: int) -> None:
-        """
-        Enable looping of a MIDI player.
+        """ Enable looping of a MIDI player.
 
         For example, if you want to loop the playlist twice, set loop to 2 and call this
         function before you start the player.
@@ -64,6 +63,31 @@ class FluidPlayer:
             loop: Times left to loop the playlist. -1 means loop infinitely.
         """
         self.handle.fluid_player_set_loop(self.player, loop)
+
+    def set_midi_tempo(self, tempo: int) -> None:
+        """ Set the tempo of a MIDI player.
+
+        Parameters:
+            tempo: Tempo to set playback speed to (in microseconds per quarter note,
+                   as per MIDI file spec)
+
+        Note:
+            Tempo change events contained in the MIDI file can override the specified tempo
+            at any time!
+        """
+        self.handle.fluid_player_set_midi_tempo(self.player, tempo)
+
+    def set_bpm(self, bpm: int) -> None:
+        """ Set the tempo of a MIDI player in beats per minute.
+
+        Parameters:
+            bpm	Tempo in beats per minute
+
+        Note:
+            Tempo change events contained in the MIDI file can override the specified BPM
+            at any time!
+        """
+        self.handle.fluid_player_set_bpm(self.player, bpm)
 
     # MIDI player status codes:
     (READY, PLAYING, DONE) = range(0, 3)

@@ -168,6 +168,14 @@ class FluidHandle:
         self.fluid_player_set_loop.argtypes = (c_void_p, c_int)
         self.fluid_player_set_loop.restype = c_int
 
+        self.fluid_player_set_midi_tempo = self.handle.fluid_player_set_midi_tempo
+        self.fluid_player_set_midi_tempo.argtypes = (c_void_p, c_int)
+        self.fluid_player_set_midi_tempo.restype = c_int
+
+        self.fluid_player_set_bpm = self.handle.fluid_player_set_bpm
+        self.fluid_player_set_bpm.argtypes = (c_void_p, c_int)
+        self.fluid_player_set_bpm.restype = c_int
+
         self.fluid_player_get_status = self.handle.fluid_player_get_status
         self.fluid_player_get_status.argtypes = (c_void_p,)
         self.fluid_player_get_status.restype = c_int
