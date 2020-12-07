@@ -89,6 +89,13 @@ class FluidPlayer:
         """
         self.handle.fluid_player_set_bpm(self.player, bpm)
 
+    # MIDI player tempo types:
+    (TEMPO_DEFAULT, TEMPO_BPM, TEMPO_MIDI, TEMPO_RELATIVE) = range(0,4)
+
+    def set_tempo(self, tempo_type: int, tempo: float) -> None:
+        """ Set MIDI player tempo: new API. """
+        self.handle.fluid_player_set_tempo(self.player, tempo_type, tempo)
+
     # MIDI player status codes:
     (READY, PLAYING, DONE) = range(0, 3)
 

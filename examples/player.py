@@ -33,8 +33,6 @@ def parse_args():
     tempo_args = parser.add_mutually_exclusive_group()
     tempo_args.add_argument("--bpm", type=int, help="Tempo in beats per minute")
     tempo_args.add_argument("--midi-tempo", type=int, help="Tempo in microseconds per quarter note")
-    parser.add_argument("--enable-tempo-hack", action='store_true',
-                        help="Set tempo again 10ms after play start")
     parser.add_argument("-r", "--repeat", type=int, default=1,
                         help="Number of times to repeat the playback (default: 1). "
                              "-1 means repeat infinitely")
@@ -84,11 +82,11 @@ class Player:
     def set_tempo(self, bpm: Optional[int] = None, midi_tempo: Optional[int] = None) -> bool:
         if bpm is not None:
             print(f'Set tempo (bpm): {bpm}')
-            self.player.set_bpm(bpm)
+            self.player.set_tempo(FluidPlayer.TEMPO_BPM, bpm)
             return True
         elif midi_tempo is not None:
             print(f'Set MIDI tempo (ms per quarter note): {midi_tempo}')
-            self.player.set_midi_tempo(midi_tempo)
+            self.player.set_tempo(FluidPlayer.TEMPO_MIDI, midi_tempo)
             return True
         else:
             return False
@@ -114,8 +112,7 @@ class Player:
         return tempo
 
     def play_midi(self, midi_files: List[str], repeat: int = 1,
-                  bpm: Optional[int] = None, midi_tempo: Optional[int] = None,
-                  enable_tempo_hack: bool = False):
+                  bpm: Optional[int] = None, midi_tempo: Optional[int] = None):
         print('Play MIDI file(s):', ', '.join(midi_files))
         if repeat != 1:
             if repeat == -1:
@@ -134,23 +131,6 @@ class Player:
             self.player.set_loop(repeat)
 
         self.player.play()
-
-        # Calling fluid_player_set_bpm() or fluid_player_set_midi_tempo() before fluid_player_play()
-        # does not work, even if the midi file does not contain any tempo information.
-        #
-        # Workaround: set tempo a little while after playback start.  Besides the fragility of that
-        # approach (the required delay may vary from machine to machine), there is another issue:
-        # when a loop is set with fluid_player_set_loop(), the tempo is reset at the repeat.
-        # Similarly, when two files without tempo set are added to the player queue with
-        # fluid_player_add(), the tempo is reset when the second file starts playing.
-        #
-        # When no tempo is set in the midi file or via API: fluidsynth will play at bpm=120.
-
-        if enable_tempo_hack:
-            print('Apply tempo hack')
-            time.sleep(0.01)
-            self.set_tempo(bpm, midi_tempo)
-            self.get_tempo(tempo_type='midi_tempo' if midi_tempo is not None else 'bpm')
 
         while self.player.get_status() == FluidPlayer.PLAYING:
             time.sleep(1)
@@ -173,7 +153,6 @@ if __name__ == "__main__":
 
     player = Player(soundfont, args.fluidsynth_library, args.audio_driver)
     try:
-        player.play_midi(args.midi_files, args.repeat,
-                         args.bpm, args.midi_tempo, args.enable_tempo_hack)
+        player.play_midi(args.midi_files, args.repeat, args.bpm, args.midi_tempo)
     except KeyboardInterrupt:
         print('Playback aborted')
