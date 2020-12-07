@@ -122,7 +122,7 @@ class FluidSettings:
                 raise KeyError(key)
         elif key_type is self.FLUID_NUM_TYPE:
             # Coerce string value to float before going further.
-            value = self._coerce_to_float(value)
+            value = float(value)
             ret = self.handle.fluid_settings_setnum(self.settings, key, value)
             if self._normalize_ret_code(ret) == constants.FAILED:
                 raise KeyError(key)
@@ -142,14 +142,6 @@ class FluidSettings:
             return int(string_value)
         except ValueError:
             return int(string_value.lower() not in ('false', 'no', 'off'))
-
-    @staticmethod
-    def _coerce_to_float(string_value):
-        """ Turn a string into an float. """
-        try:
-            return float(string_value)
-        except ValueError:
-            return float(string_value.lower() not in ('false', 'no', 'off'))
 
     def _normalize_ret_code(self, ret_code):
         """Normalize the code returned by a fluid_settings_* function.
