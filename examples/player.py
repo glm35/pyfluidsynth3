@@ -36,6 +36,7 @@ def parse_args():
     parser.add_argument("-r", "--repeat", type=int, default=1,
                         help="Number of times to repeat the playback (default: 1). "
                              "-1 means repeat infinitely")
+
     parser.add_argument("-ad", "--audio-driver", default='alsa',
                         help="Audio driver to be used by fluidsynth (default: alsa)")
     parser.add_argument("-sf", "--soundfont",
@@ -43,6 +44,9 @@ def parse_args():
                              "(default: %(prog)s will try to find it).")
     parser.add_argument("-l", "--fluidsynth-library",
                         help="Path to libfluidsynth (default: pyfluidsynth3 will try to find it).")
+
+    parser.add_argument("--test-delay-set-tempo", action="store_true",
+                        help="For test purpose, set tempo 3s after start of playback")
 
     return parser.parse_args()
 
@@ -112,7 +116,8 @@ class Player:
         return tempo
 
     def play_midi(self, midi_files: List[str], repeat: int = 1,
-                  bpm: Optional[int] = None, midi_tempo: Optional[int] = None):
+                  bpm: Optional[int] = None, midi_tempo: Optional[int] = None,
+                  test_delay_set_tempo: bool = False):
         print('Play MIDI file(s):', ', '.join(midi_files))
         if repeat != 1:
             if repeat == -1:
@@ -121,7 +126,7 @@ class Player:
                 print(f'Repeat {repeat} times')
 
         self.get_tempo(tempo_type='midi_tempo' if midi_tempo is not None else 'bpm')
-        if self.set_tempo(bpm, midi_tempo):
+        if not test_delay_set_tempo and self.set_tempo(bpm, midi_tempo):
             self.get_tempo(tempo_type='midi_tempo' if midi_tempo is not None else 'bpm')
 
         for midi_file in midi_files:
@@ -132,8 +137,15 @@ class Player:
 
         self.player.play()
 
+        playback_time = 0
         while self.player.get_status() == FluidPlayer.PLAYING:
             time.sleep(1)
+            playback_time += 1
+
+            if test_delay_set_tempo and playback_time == 3:
+                self.get_tempo(tempo_type='midi_tempo' if midi_tempo is not None else 'bpm')
+                if self.set_tempo(bpm, midi_tempo):
+                    self.get_tempo(tempo_type='midi_tempo' if midi_tempo is not None else 'bpm')
 
             # Remark: instead of polling player status, it is also possible to use
             # self.player.join().  But this is not interruptable with Ctrl+C.
@@ -153,6 +165,7 @@ if __name__ == "__main__":
 
     player = Player(soundfont, args.fluidsynth_library, args.audio_driver)
     try:
-        player.play_midi(args.midi_files, args.repeat, args.bpm, args.midi_tempo)
+        player.play_midi(args.midi_files, args.repeat, args.bpm, args.midi_tempo,
+                         args.test_delay_set_tempo)
     except KeyboardInterrupt:
         print('Playback aborted')
