@@ -73,6 +73,10 @@ class Player:
 
         self.repeat_count = 1
 
+        # By default, use tempo from midi file or default fluidsynth tempo (120 bpm)
+        self.tempo_bpm = None
+        self.midi_tempo = None
+
     def __del__(self):
         if self._fluidplayer is not None:
             del self._fluidplayer
@@ -98,6 +102,7 @@ class Player:
         if self._fluidplayer is None:
             self._fluidplayer = FluidPlayer(self.handle, self.synth)
             self._fluidplayer.set_loop(self.repeat_count)
+            self._set_tempo(bpm=self.tempo_bpm, midi_tempo=self.midi_tempo)
 
             for midi_file in self._playlist:
                 self._fluidplayer.add(midi_file)
@@ -140,6 +145,50 @@ class Player:
         if self._fluidplayer is not None:
             self._fluidplayer.set_loop(self.repeat_count)
 
+    # Tempo control
+
+    @property
+    def tempo_bpm(self):
+        return self._tempo_bpm
+
+    @tempo_bpm.setter
+    def tempo_bpm(self, bpm: Optional[int]):
+        if bpm is not None and bpm <= 0:
+            raise ValueError
+        self._tempo_bpm = bpm
+        self._midi_tempo = None
+        print(f"Player: set tempo bpm={bpm}")
+        self._set_tempo(bpm=bpm)
+
+    @property
+    def midi_tempo(self):
+        return self._midi_tempo
+
+    @midi_tempo.setter
+    def midi_tempo(self, midi_tempo: Optional[int]):
+        if midi_tempo is not None and midi_tempo <= 0:
+            raise ValueError
+        self._midi_tempo = midi_tempo
+        self._tempo_bpm = None
+        print(f"Player: set midi tempo={midi_tempo} us/quarter note")
+        self._set_tempo(midi_tempo=midi_tempo)
+
+    def _set_tempo(self, bpm: Optional[int] = None, midi_tempo: Optional[int] = None) -> bool:
+        if self._fluidplayer is None:
+            return False
+        if bpm is not None:
+            print(f'Set tempo (bpm): {bpm}')
+            self._fluidplayer.set_tempo(FluidPlayer.TEMPO_BPM, bpm)
+            return True
+        elif midi_tempo is not None:
+            print(f'Set MIDI tempo (ms per quarter note): {midi_tempo}')
+            self._fluidplayer.set_tempo(FluidPlayer.TEMPO_MIDI, midi_tempo)
+            return True
+        else:
+            print(f'Use default tempo')
+            self._fluidplayer.set_tempo(FluidPlayer.TEMPO_DEFAULT, tempo=0)
+            return True
+
 
 class PlayerGui:
     def __init__(self, player: Player):
@@ -150,6 +199,7 @@ class PlayerGui:
         self._create_playlist_box()
         self._create_playback_control_frame()
         self._create_loop_control_frame()
+        self._create_tempo_frame()
 
     def _create_playlist_box(self):
         self._playlist = tk.Listbox(self._root)
@@ -168,7 +218,7 @@ class PlayerGui:
         button_play = tk.Button(self._playback_control, text='Play',
                                 command=self._player.play)
         button_play.pack(side=tk.LEFT)
-        self._playback_control.pack(fill=tk.X, expand=1)
+        self._playback_control.pack(side=tk.TOP, fill=tk.X)
 
     (NO_LOOP, LOOP_FOREVER, REPEAT) = (1, 2, 3)
 
@@ -191,7 +241,7 @@ class PlayerGui:
         self._repeat_entry.pack(side=tk.LEFT)
         tk.Label(self._loop_control_frame, text="times").pack(side=tk.LEFT)
 
-        self._loop_control_frame.pack(fill=tk.X, expand=1)
+        self._loop_control_frame.pack(side=tk.TOP, fill=tk.X)
 
     def _on_loop_control(self):
         loop_control_mode = self._loop_value.get()
@@ -208,6 +258,57 @@ class PlayerGui:
     def _on_repeat_entry_return_keypress(self, event=None):
         self._loop_value.set(self.REPEAT)
         self._on_loop_control()
+
+    def _create_tempo_frame(self):
+        self._tempo_frame = tk.Frame(self._root)
+        tk.Label(self._tempo_frame, text="Set tempo:").grid(row=0, column=0, columnspan=3, sticky=tk.W)
+
+        tk.Label(self._tempo_frame, text="bpm:", justify=tk.RIGHT)\
+            .grid(row=1, column=0, sticky=tk.E)
+        self._tempo_bpm_entry = tk.Entry(self._tempo_frame, width=3)
+        self._tempo_bpm_entry.grid(row=1, column=1, sticky=tk.W)
+        self._tempo_bpm_entry.bind("<Return>", self._on_set_tempo_bpm)
+        self._tempo_bpm_entry.bind("<KP_Enter>", self._on_set_tempo_bpm)
+        self._tempo_bpm_button = tk.Button(self._tempo_frame, text="Set tempo (bpm)",
+                                          command=self._on_set_tempo_bpm)
+        self._tempo_bpm_button.grid(row=1, column=2, sticky=tk.W)
+
+        tk.Label(self._tempo_frame, text="MIDI tempo:", justify=tk.RIGHT).grid(row=2, column=0, sticky=tk.W)
+        self._midi_tempo_entry = tk.Entry(self._tempo_frame, width=8)
+        self._midi_tempo_entry.grid(row=2, column=1, sticky=tk.W)
+        self._midi_tempo_entry.bind("<Return>", self._on_set_midi_tempo)
+        self._midi_tempo_entry.bind("<KP_Enter>", self._on_set_midi_tempo)
+        self._midi_tempo_button = tk.Button(self._tempo_frame,
+                                            text="Set MIDI tempo (µs/quarter note)",
+                                            command=self._on_set_midi_tempo)
+        self._midi_tempo_button.grid(row=2, column=2, sticky=tk.W)
+
+        self._reset_tempo_button = tk.Button(self._tempo_frame,
+                                             text="Reset tempo (use tempo from midi file)",
+                                             command=self._on_reset_tempo)
+        self._reset_tempo_button.grid(row=3, column=0, columnspan=3, sticky=tk.W+tk.E)
+
+        self._tempo_frame.pack(side=tk.TOP, fill=tk.X)
+
+    def _on_set_tempo_bpm(self, event=None):
+        try:
+            self._player.tempo_bpm = int(self._tempo_bpm_entry.get())
+            self._midi_tempo_entry.delete(0, len(self._midi_tempo_entry.get()))
+        except ValueError:
+            pass
+
+    def _on_set_midi_tempo(self, event=None):
+        try:
+            self._player.midi_tempo = int(self._midi_tempo_entry.get())
+            self._tempo_bpm_entry.delete(0, len(self._tempo_bpm_entry.get()))
+        except ValueError:
+            pass
+
+    def _on_reset_tempo(self):
+        self._tempo_bpm_entry.delete(0, len(self._tempo_bpm_entry.get()))
+        self._player.tempo_bpm = None
+        self._midi_tempo_entry.delete(0, len(self._midi_tempo_entry.get()))
+        self._player.midi_tempo = None
 
     def mainloop(self):
         self._root.mainloop()
