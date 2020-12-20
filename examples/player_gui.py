@@ -71,6 +71,8 @@ class Player:
 
         self._playlist = []
 
+        self.repeat_count = 1
+
     def __del__(self):
         if self._fluidplayer is not None:
             del self._fluidplayer
@@ -95,10 +97,13 @@ class Player:
 
         if self._fluidplayer is None:
             self._fluidplayer = FluidPlayer(self.handle, self.synth)
+            self._fluidplayer.set_loop(self.repeat_count)
+
             for midi_file in self._playlist:
                 self._fluidplayer.add(midi_file)
         else:
             self._fluidplayer.play()
+            # TODO: if playback is finished, need to restart
 
     def pause(self):
         """Pause playback."""
@@ -112,7 +117,7 @@ class Player:
         if self._fluidplayer is not None:
             # No way to stop playback and resume at the beginning of the
             # playlist with fluidsynth, so we just delete the player.
-            # Before that we call stop(), else the last note will resonate for a while.
+            # Before that we call stop(), else the last note will resonate for a while.
             # We need a short delay to let that happen before the player is
             # deleted.
             self._fluidplayer.stop()
@@ -120,18 +125,39 @@ class Player:
             del self._fluidplayer
             self._fluidplayer = None
 
+    # Loop control
+
+    @property
+    def repeat_count(self):
+        return self._repeat_count
+
+    @repeat_count.setter
+    def repeat_count(self, count):
+        if count == 0 or count < -1:
+            raise ValueError("repeat count must be > 0 or equal to -1 (infinite)")
+        print(f"Player: repeat_count={count}")
+        self._repeat_count = count
+        if self._fluidplayer is not None:
+            self._fluidplayer.set_loop(self.repeat_count)
+
 
 class PlayerGui:
-    def __init__(self, player):
+    def __init__(self, player: Player):
         self._player = player
         self._root = tk.Tk()
         self._root.title('pyfluidsynth3 example player GUI')
 
+        self._create_playlist_box()
+        self._create_playback_control_frame()
+        self._create_loop_control_frame()
+
+    def _create_playlist_box(self):
         self._playlist = tk.Listbox(self._root)
         self._playlist.pack(side=tk.TOP, fill=tk.BOTH, expand=1)
         for midi_file in self._player.get_playlist():
             self._playlist.insert(tk.END, midi_file)
 
+    def _create_playback_control_frame(self):
         self._playback_control = tk.Frame(self._root)
         button_stop = tk.Button(self._playback_control, text='Stop',
                                 command=self._player.stop)
@@ -143,6 +169,45 @@ class PlayerGui:
                                 command=self._player.play)
         button_play.pack(side=tk.LEFT)
         self._playback_control.pack(fill=tk.X, expand=1)
+
+    (NO_LOOP, LOOP_FOREVER, REPEAT) = (1, 2, 3)
+
+    def _create_loop_control_frame(self):
+        self._loop_control_frame = tk.Frame(self._root)
+
+        self._loop_value = tk.IntVar()
+        self._loop_value.set(self.NO_LOOP)
+        for txt, val in [("No Loop", self.NO_LOOP),
+                         ("Loop Forever", self.LOOP_FOREVER),
+                         ("Repeat", self.REPEAT)]:
+            radio_button = tk.Radiobutton(self._loop_control_frame,
+                                          text=txt, variable=self._loop_value, value=val,
+                                          command=self._on_loop_control)
+            radio_button.pack(side=tk.LEFT)
+
+        self._repeat_entry = tk.Entry(self._loop_control_frame, width=3)
+        self._repeat_entry.bind("<Return>", self._on_repeat_entry_return_keypress)
+        self._repeat_entry.bind("<KP_Enter>", self._on_repeat_entry_return_keypress)
+        self._repeat_entry.pack(side=tk.LEFT)
+        tk.Label(self._loop_control_frame, text="times").pack(side=tk.LEFT)
+
+        self._loop_control_frame.pack(fill=tk.X, expand=1)
+
+    def _on_loop_control(self):
+        loop_control_mode = self._loop_value.get()
+        if loop_control_mode == self.NO_LOOP:
+            self._player.repeat_count = 1
+        elif loop_control_mode == self.LOOP_FOREVER:
+            self._player.repeat_count = -1
+        elif loop_control_mode == self.REPEAT:
+            try:
+                self._player.repeat_count = int(self._repeat_entry.get())
+            except ValueError:
+                pass
+
+    def _on_repeat_entry_return_keypress(self, event=None):
+        self._loop_value.set(self.REPEAT)
+        self._on_loop_control()
 
     def mainloop(self):
         self._root.mainloop()
