@@ -15,6 +15,7 @@ Run with:
 import argparse
 import pathlib
 import sys
+from threading import Timer
 import time
 import tkinter as tk
 from typing import List, Optional
@@ -189,17 +190,40 @@ class Player:
             self._fluidplayer.set_tempo(FluidPlayer.TEMPO_DEFAULT, tempo=0)
             return True
 
+    def get_tempo(self):
+        if self._fluidplayer is None:
+            return None
+        tempo_bpm, sync_mode = self._fluidplayer.get_tempo(FluidPlayer.TEMPO_BPM)
+        if sync_mode == 0:
+            sync_mode_str = "external"
+        elif sync_mode == 1:
+            sync_mode_str = "internal"
+        else:
+            sync_mode_str = str(sync_mode)
+
+        midi_tempo, _ = self._fluidplayer.get_tempo(FluidPlayer.TEMPO_MIDI)
+        default_tempo, _ = self._fluidplayer.get_tempo(FluidPlayer.TEMPO_DEFAULT)
+
+        return tempo_bpm, midi_tempo, default_tempo, sync_mode_str
+
 
 class PlayerGui:
     def __init__(self, player: Player):
         self._player = player
+        self._timer = None  # 1s cyclic timer to update the get tempo label
         self._root = tk.Tk()
+        self._root.protocol('WM_DELETE_WINDOW', self._on_exit)
         self._root.title('pyfluidsynth3 example player GUI')
 
         self._create_playlist_box()
         self._create_playback_control_frame()
         self._create_loop_control_frame()
         self._create_tempo_frame()
+
+    def _on_exit(self, event=None):
+        if self._timer is not None:
+            self._timer.cancel()
+        self._root.destroy()
 
     def _create_playlist_box(self):
         self._playlist = tk.Listbox(self._root)
@@ -216,9 +240,16 @@ class PlayerGui:
                                  command=self._player.pause)
         button_pause.pack(side=tk.LEFT)
         button_play = tk.Button(self._playback_control, text='Play',
-                                command=self._player.play)
+                                command=self._on_play)
         button_play.pack(side=tk.LEFT)
         self._playback_control.pack(side=tk.TOP, fill=tk.X)
+
+    def _on_play(self):
+        self._player.play()
+        if self._timer is None:
+            self._timer = Timer(interval=1, function=self._on_timeout)
+            self._timer.start()
+        self._update_get_tempo_label()
 
     (NO_LOOP, LOOP_FOREVER, REPEAT) = (1, 2, 3)
 
@@ -261,7 +292,7 @@ class PlayerGui:
 
     def _create_tempo_frame(self):
         self._tempo_frame = tk.Frame(self._root)
-        tk.Label(self._tempo_frame, text="Set tempo:").grid(row=0, column=0, columnspan=3, sticky=tk.W)
+        tk.Label(self._tempo_frame, text="Set tempo:").grid(row=0, columnspan=3, sticky=tk.W)
 
         tk.Label(self._tempo_frame, text="bpm:", justify=tk.RIGHT)\
             .grid(row=1, column=0, sticky=tk.E)
@@ -273,7 +304,7 @@ class PlayerGui:
                                           command=self._on_set_tempo_bpm)
         self._tempo_bpm_button.grid(row=1, column=2, sticky=tk.W)
 
-        tk.Label(self._tempo_frame, text="MIDI tempo:", justify=tk.RIGHT).grid(row=2, column=0, sticky=tk.W)
+        tk.Label(self._tempo_frame, text="MIDI tempo:", justify=tk.RIGHT).grid(row=2, sticky=tk.W)
         self._midi_tempo_entry = tk.Entry(self._tempo_frame, width=8)
         self._midi_tempo_entry.grid(row=2, column=1, sticky=tk.W)
         self._midi_tempo_entry.bind("<Return>", self._on_set_midi_tempo)
@@ -288,12 +319,16 @@ class PlayerGui:
                                              command=self._on_reset_tempo)
         self._reset_tempo_button.grid(row=3, column=0, columnspan=3, sticky=tk.W+tk.E)
 
+        self._get_tempo_label = tk.Label(self._tempo_frame, text="Get tempo:")
+        self._get_tempo_label.grid(row=5, columnspan=3, sticky=tk.W)
+
         self._tempo_frame.pack(side=tk.TOP, fill=tk.X)
 
     def _on_set_tempo_bpm(self, event=None):
         try:
             self._player.tempo_bpm = int(self._tempo_bpm_entry.get())
             self._midi_tempo_entry.delete(0, len(self._midi_tempo_entry.get()))
+            self._update_get_tempo_label()
         except ValueError:
             pass
 
@@ -301,14 +336,31 @@ class PlayerGui:
         try:
             self._player.midi_tempo = int(self._midi_tempo_entry.get())
             self._tempo_bpm_entry.delete(0, len(self._tempo_bpm_entry.get()))
-        except ValueError:
-            pass
+            self._update_get_tempo_label()
+        except ValueError as e:
+            print(e)
 
     def _on_reset_tempo(self):
         self._tempo_bpm_entry.delete(0, len(self._tempo_bpm_entry.get()))
         self._player.tempo_bpm = None
         self._midi_tempo_entry.delete(0, len(self._midi_tempo_entry.get()))
         self._player.midi_tempo = None
+        self._update_get_tempo_label()
+
+    def _update_get_tempo_label(self):
+        tempo_label = "Get tempo:"
+        try:
+            (tempo_bpm, midi_tempo, default_tempo, sync_mode) = self._player.get_tempo()
+            tempo_label += " bpm={0}, MIDI tempo={1}, default tempo={2}, sync_mode={3}".format(
+                tempo_bpm, midi_tempo, default_tempo, sync_mode)
+        except TypeError:
+            pass
+        self._get_tempo_label.config(text=tempo_label)
+
+    def _on_timeout(self):
+        self._update_get_tempo_label()
+        self._timer = Timer(interval=1, function=self._on_timeout)
+        self._timer.start()
 
     def mainloop(self):
         self._root.mainloop()

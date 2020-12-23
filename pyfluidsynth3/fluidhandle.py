@@ -195,6 +195,13 @@ class FluidHandle:
         self.fluid_player_get_midi_tempo.argtypes = (c_void_p,)
         self.fluid_player_get_midi_tempo.restype = c_int
 
+        try:
+            self.fluid_player_get_tempo = self.handle.fluid_player_get_tempo
+            self.fluid_player_get_tempo.argtypes = (c_void_p, c_int, c_void_p, c_void_p)
+            self.fluid_player_get_tempo.restype = c_int
+        except AttributeError:
+            pass
+
         # From event.h
         self.new_fluid_event = self.handle.new_fluid_event
         self.new_fluid_event.argtypes = ()

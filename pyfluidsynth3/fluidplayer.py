@@ -1,6 +1,8 @@
 #! /usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+import ctypes
+
 from . import constants, fluiderror, utility
 
 
@@ -124,6 +126,29 @@ class FluidPlayer:
             Tempo of the MIDI player (in microseconds per quarter note, as per MIDI file spec)
         """
         return self.handle.fluid_player_get_midi_tempo(self.player)
+
+    def get_tempo(self, tempo_type: int = TEMPO_BPM) -> (int, int):
+        """ Get the tempo of a MIDI player
+
+        Args:
+            tempo_type: one of TEMPO_DEFAULT, TEMPO_BPM, TEMPO_MIDI, TEMPO_RELATIVE
+
+        Returns: a tuple (tempo, sync_mode)
+
+        Raises: ValueError (incorrect parameter)
+        """
+        tempo = ctypes.c_double()
+        sync_mode = ctypes.c_int()
+        ret = self.handle.fluid_player_get_tempo(self.player, tempo_type,
+                                                 ctypes.byref(tempo), ctypes.byref(sync_mode))
+        if ret != constants.OK:
+            raise ValueError
+
+        if tempo_type in (self.TEMPO_DEFAULT, self.TEMPO_BPM, self.TEMPO_MIDI):
+            tempo = int(tempo.value)
+        sync_mode = int(sync_mode.value)
+
+        return tempo, sync_mode
 
     def pause(self):
         """ Pause player or start again if already paused. """
