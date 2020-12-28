@@ -74,6 +74,11 @@ class Player:
 
         self.repeat_count = 1
 
+        # fluidsynth tempo API to be used:
+        # 1: old API (pre 2.2.0)
+        # 2: new API (2.2.0): fluid_player_set_tempo(), fluid_player_get_tempo()
+        self.tempo_api = 2
+
         # By default, use tempo from midi file or default fluidsynth tempo (120 bpm)
         self.tempo_bpm = None
         self.midi_tempo = None
@@ -203,6 +208,11 @@ class Player:
         if self._fluidplayer is None:
             return
 
+        if self.tempo_api == 1:
+            print("Player._set_tempo: Using legacy API")
+            self._set_tempo_legacy(bpm, midi_tempo)
+            return
+
         if scale_factor is not None:
             print(f'Player._set_tempo: Set relative tempo: x{scale_factor}')
             self._fluidplayer.set_tempo(FluidPlayer.TEMPO_RELATIVE, scale_factor)
@@ -217,9 +227,26 @@ class Player:
             print(f'Player._set_tempo: Reset tempo (use MIDI file tempo)')
             self._fluidplayer.set_tempo(FluidPlayer.TEMPO_DEFAULT, tempo=0)
 
+    def _set_tempo_legacy(self, bpm: Optional[int] = None, midi_tempo: Optional[int] = None):
+        if self._fluidplayer is None:
+            return
+
+        if bpm is not None:
+            print(f'Player._set_tempo_legacy: Set tempo (bpm): {bpm}')
+            self._fluidplayer.set_bpm(bpm)
+        elif midi_tempo is not None:
+            print(f'Player._set_tempo_legacy: Set MIDI tempo (ms per quarter note): {midi_tempo}')
+            self._fluidplayer.set_midi_tempo(midi_tempo)
+
     def get_tempo(self):
         if self._fluidplayer is None:
             return None
+
+        if self.tempo_api == 1:
+            tempo_bpm = self._fluidplayer.get_bpm()
+            midi_tempo = self._fluidplayer.get_midi_tempo()
+            return tempo_bpm, midi_tempo, None, None
+
         tempo_bpm, sync_mode = self._fluidplayer.get_tempo(FluidPlayer.TEMPO_BPM)
         if sync_mode == 0:
             sync_mode_str = "external"
@@ -319,44 +346,56 @@ class PlayerGui:
 
     def _create_tempo_frame(self):
         self._tempo_frame = tk.Frame(self._root)
-        tk.Label(self._tempo_frame, text="Set tempo:").grid(row=0, columnspan=3, sticky=tk.W)
 
-        tk.Label(self._tempo_frame, text="bpm:", justify=tk.RIGHT).grid(row=1, column=0, sticky=tk.E)
+        tk.Label(self._tempo_frame, text="Tempo API:").grid(row=0, sticky=tk.E)
+        self._tempo_api = tk.IntVar()
+        self._tempo_api.set(2)
+        tk.Radiobutton(self._tempo_frame, text="New (>= 2.2.0)",
+                       variable=self._tempo_api, value=2, command=self._on_set_tempo_api).grid(row=0, column=1)
+        tk.Radiobutton(self._tempo_frame, text="Old (< 2.2.0)",
+                       variable=self._tempo_api, value=1, command=self._on_set_tempo_api).grid(row=0, column=2)
+
+        tk.Label(self._tempo_frame, text="Set tempo:").grid(row=1, columnspan=3, sticky=tk.W)
+
+        tk.Label(self._tempo_frame, text="bpm:", justify=tk.RIGHT).grid(row=2, column=0, sticky=tk.E)
         self._tempo_bpm_entry = tk.Entry(self._tempo_frame, width=5)
-        self._tempo_bpm_entry.grid(row=1, column=1, sticky=tk.W)
+        self._tempo_bpm_entry.grid(row=2, column=1, sticky=tk.W)
         self._tempo_bpm_entry.bind("<Return>", self._on_set_tempo_bpm)
         self._tempo_bpm_entry.bind("<KP_Enter>", self._on_set_tempo_bpm)
         self._tempo_bpm_button = tk.Button(self._tempo_frame, text="Set tempo (bpm)",
                                           command=self._on_set_tempo_bpm)
-        self._tempo_bpm_button.grid(row=1, column=2, sticky=tk.W)
+        self._tempo_bpm_button.grid(row=2, column=2, sticky=tk.W)
 
-        tk.Label(self._tempo_frame, text="MIDI tempo:", justify=tk.RIGHT).grid(row=2, sticky=tk.E)
+        tk.Label(self._tempo_frame, text="MIDI tempo:", justify=tk.RIGHT).grid(row=3, sticky=tk.E)
         self._midi_tempo_entry = tk.Entry(self._tempo_frame, width=8)
-        self._midi_tempo_entry.grid(row=2, column=1, sticky=tk.W)
+        self._midi_tempo_entry.grid(row=3, column=1, sticky=tk.W)
         self._midi_tempo_entry.bind("<Return>", self._on_set_midi_tempo)
         self._midi_tempo_entry.bind("<KP_Enter>", self._on_set_midi_tempo)
         self._midi_tempo_button = tk.Button(self._tempo_frame,
                                             text="Set MIDI tempo (µs/quarter note)",
                                             command=self._on_set_midi_tempo)
-        self._midi_tempo_button.grid(row=2, column=2, sticky=tk.W)
+        self._midi_tempo_button.grid(row=3, column=2, sticky=tk.W)
 
-        tk.Label(self._tempo_frame, text="Scale factor:").grid(row=3, sticky=tk.E)
+        tk.Label(self._tempo_frame, text="Scale factor:").grid(row=4, sticky=tk.E)
         self._scale_factor_entry = tk.Entry(self._tempo_frame, width=8)
-        self._scale_factor_entry.grid(row=3, column=1, sticky=tk.W)
+        self._scale_factor_entry.grid(row=4, column=1, sticky=tk.W)
         self._scale_factor_entry.bind("<Return>", self._on_set_tempo_scale_factor)
         self._scale_factor_entry.bind("<KP_Enter>", self._on_set_tempo_scale_factor)
         tk.Button(self._tempo_frame, text="Speed up/slow down", command=self._on_set_tempo_scale_factor)\
-            .grid(row=3, column=2, sticky=tk.W)
+            .grid(row=4, column=2, sticky=tk.W)
 
         self._reset_tempo_button = tk.Button(self._tempo_frame,
                                              text="Reset tempo (use tempo from midi file)",
                                              command=self._on_reset_tempo)
-        self._reset_tempo_button.grid(row=4, column=0, columnspan=3, sticky=tk.W+tk.E)
+        self._reset_tempo_button.grid(row=5, column=0, columnspan=3, sticky=tk.W+tk.E)
 
         self._get_tempo_label = tk.Label(self._tempo_frame, text="Get tempo:")
-        self._get_tempo_label.grid(row=5, columnspan=3, sticky=tk.W)
+        self._get_tempo_label.grid(row=6, columnspan=3, sticky=tk.W)
 
         self._tempo_frame.pack(side=tk.TOP, fill=tk.X)
+
+    def _on_set_tempo_api(self, event=None):
+        self._player.tempo_api = self._tempo_api.get()
 
     def _on_set_tempo_bpm(self, event=None):
         self._player.tempo_bpm = int(self._tempo_bpm_entry.get())
