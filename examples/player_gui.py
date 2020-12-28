@@ -122,6 +122,7 @@ class Player:
         print("Player: pause")
         if self._fluidplayer is not None:
             self._fluidplayer.stop()  # fluid_player_stop() actually just pauses playback...
+            # TODO: use pause from pyfluidsynth3!
 
     def stop(self):
         """Stop playing."""
@@ -136,6 +137,18 @@ class Player:
             time.sleep(0.2)
             del self._fluidplayer
             self._fluidplayer = None
+
+    def get_ticks(self):
+        if self._fluidplayer is None:
+            return None, None
+        current_tick = self._fluidplayer.get_current_tick()
+        total_ticks = self._fluidplayer.get_total_ticks()
+        return current_tick, total_ticks
+
+    def seek(self, ticks: int):
+        if self._fluidplayer is None:
+            return
+        self._fluidplayer.seek(ticks)
 
     # Loop control
 
@@ -286,17 +299,19 @@ class PlayerGui:
             self._playlist.insert(tk.END, midi_file)
 
     def _create_playback_control_frame(self):
-        self._playback_control = tk.Frame(self._root)
-        button_stop = tk.Button(self._playback_control, text='Stop',
-                                command=self._player.stop)
-        button_stop.pack(side=tk.LEFT)
-        button_pause = tk.Button(self._playback_control, text='Pause',
-                                 command=self._player.pause)
-        button_pause.pack(side=tk.LEFT)
-        button_play = tk.Button(self._playback_control, text='Play',
-                                command=self._on_play)
-        button_play.pack(side=tk.LEFT)
-        self._playback_control.pack(side=tk.TOP, fill=tk.X)
+        frame = tk.Frame(self._root)
+
+        button_frame = tk.Frame(frame)
+        tk.Button(button_frame, text='Stop', command=self._player.stop).pack(side=tk.LEFT)
+        tk.Button(button_frame, text='Pause', command=self._player.pause).pack(side=tk.LEFT)
+        tk.Button(button_frame, text='Play', command=self._on_play).pack(side=tk.LEFT)
+        tk.Button(button_frame, text='Rewind', command=self._on_rewind).pack(side=tk.LEFT)
+        button_frame.pack(fill=tk.X)
+
+        self._playback_position = tk.Label(frame, text="Playback position:")
+        self._playback_position.pack(side=tk.LEFT, fill=tk.X)
+
+        frame.pack(fill=tk.X)
 
     def _on_play(self):
         self._player.play()
@@ -304,6 +319,13 @@ class PlayerGui:
             self._timer = Timer(interval=1, function=self._on_timeout)
             self._timer.start()
         self._update_get_tempo_label()
+
+    def _on_rewind(self):
+        self._player.seek(0)
+
+    def _update_playback_position(self):
+        current, total = player.get_ticks()
+        self._playback_position.config(text=f"Playback position (ticks): {current}/{total}")
 
     (NO_LOOP, LOOP_FOREVER, REPEAT) = (1, 2, 3)
 
@@ -429,6 +451,7 @@ class PlayerGui:
         self._get_tempo_label.config(text=tempo_label)
 
     def _on_timeout(self):
+        self._update_playback_position()
         self._update_get_tempo_label()
         self._timer = Timer(interval=1, function=self._on_timeout)
         self._timer.start()

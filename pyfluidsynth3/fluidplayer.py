@@ -46,10 +46,34 @@ class FluidPlayer:
         self.handle.fluid_player_play(self.player)
         self.paused = False
 
+    def seek(self, ticks: int):
+        """ Seek in the currently playing file.
+
+        Args:
+            ticks: the position to seek to in the current file
+
+        Returns:
+            FLUID_FAILED if ticks is negative or after the latest tick of the file [or, since 2.1.3, if another seek
+            operation is currently in progress], FLUID_OK otherwise.
+
+            The actual seek will be performed when the synth calls back the player (i.e. a few levels above the
+            player's callback set with fluid_player_set_playback_callback()). If the player's status is
+            FLUID_PLAYER_PLAYING and a previous seek operation has not been completed yet, FLUID_FAILED is returned.
+        """
+        return self.handle.fluid_player_seek(self.player, ticks)
+
     def stop(self):
         """ Stop a MIDI player. """
         self.handle.fluid_player_stop(self.player)
         self.paused = True
+
+    def get_total_ticks(self):
+        """ Looks through all available MIDI tracks and gets the absolute tick of the very last event to play.
+
+        Returns
+            Total tick count of the sequence
+        """
+        return self.handle.fluid_player_get_total_ticks(self.player)
 
     def join(self):
         """ Wait for a MIDI player to terminate (when done playing). """
@@ -90,6 +114,14 @@ class FluidPlayer:
             at any time!
         """
         self.handle.fluid_player_set_bpm(self.player, bpm)
+
+    def get_current_tick(self) -> int:
+        """ Get the number of tempo ticks passed.
+
+            Returns
+                The number of tempo ticks passed
+        """
+        return self.handle.fluid_player_get_current_tick(self.player)
 
     # MIDI player tempo types:
     (TEMPO_DEFAULT, TEMPO_BPM, TEMPO_MIDI, TEMPO_RELATIVE) = range(0, 4)

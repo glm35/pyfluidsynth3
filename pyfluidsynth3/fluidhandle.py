@@ -156,6 +156,10 @@ class FluidHandle:
         self.fluid_player_play.argtypes = (c_void_p,)
         self.fluid_player_play.restype = c_int
 
+        self.fluid_player_seek = self.handle.fluid_player_seek
+        self.fluid_player_seek.argtypes = (c_void_p, c_int)
+        self.fluid_player_seek.restype = c_int
+
         self.fluid_player_stop = self.handle.fluid_player_stop
         self.fluid_player_stop.argtypes = (c_void_p,)
         self.fluid_player_stop.restype = c_int
@@ -191,6 +195,10 @@ class FluidHandle:
         self.fluid_player_get_bpm.argtypes = (c_void_p,)
         self.fluid_player_get_bpm.restype = c_int
 
+        self.fluid_player_get_current_tick = self.handle.fluid_player_get_current_tick
+        self.fluid_player_get_current_tick.argtypes = (c_void_p,)
+        self.fluid_player_get_current_tick.restype = c_int
+
         self.fluid_player_get_midi_tempo = self.handle.fluid_player_get_midi_tempo
         self.fluid_player_get_midi_tempo.argtypes = (c_void_p,)
         self.fluid_player_get_midi_tempo.restype = c_int
@@ -201,6 +209,10 @@ class FluidHandle:
             self.fluid_player_get_tempo.restype = c_int
         except AttributeError:
             pass
+
+        self.fluid_player_get_total_ticks = self.handle.fluid_player_get_total_ticks
+        self.fluid_player_get_total_ticks.argtypes = (c_void_p,)
+        self.fluid_player_get_total_ticks.restype = c_int
 
         # From event.h
         self.new_fluid_event = self.handle.new_fluid_event
